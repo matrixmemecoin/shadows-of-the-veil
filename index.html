@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shadows of the Veil</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Georgia',serif; background:#0a0a12; color:#e8e0d0; height:100vh; overflow:hidden; user-select:none; }
+#game { width:100%; height:100vh; position:relative; display:flex; flex-direction:column; }
+
+/* BACKGROUND */
+#bg-layer {
+  position:absolute; inset:0; z-index:0;
+  background-size:cover; background-position:center;
+  transition:opacity 1.2s ease;
+}
+#bg-layer::after {
+  content:'';
+  position:absolute; inset:0;
+  background:linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.15) 60%, rgba(0,0,0,0.72) 100%);
+}
+
+/* PARTICLES */
+#particles { position:absolute; inset:0; z-index:2; pointer-events:none; overflow:hidden; }
+.particle { position:absolute; border-radius:50%; animation:floatUp linear infinite; opacity:0; }
+@keyframes floatUp {
+  0%   { transform:translateY(0) translateX(0); opacity:0; }
+  10%  { opacity:1; }
+  90%  { opacity:0.5; }
+  100% { transform:translateY(-100vh) translateX(20px); opacity:0; }
+}
+
+/* TOP BAR */
+#top-bar {
+  position:relative; z-index:10;
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 24px;
+  background:linear-gradient(to bottom,rgba(0,0,0,0.6),transparent);
+}
+#game-title { font-size:12px; letter-spacing:4px; text-transform:uppercase; color:rgba(220,200,160,0.5); }
+#stats { display:flex; gap:20px; }
+.stat { display:flex; flex-direction:column; align-items:center; gap:4px; }
+.stat-label { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(220,200,160,0.4); font-family:sans-serif; }
+.stat-bar { width:70px; height:2px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden; }
+.stat-fill { height:100%; border-radius:2px; transition:width 0.6s ease; }
+.temptation-fill { background:linear-gradient(to right,#a05030,#e08050); }
+.duty-fill { background:linear-gradient(to right,#304080,#5080d0); }
+
+/* MAIN AREA */
+#main { flex:1; position:relative; z-index:5; display:flex; flex-direction:column; justify-content:flex-end; }
+
+/* CHARACTER — full figure left-center */
+#char-wrap {
+  position:absolute;
+  bottom:155px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:6;
+  display:none;
+  align-items:flex-end;
+  justify-content:center;
+  pointer-events:none;
+}
+#char-img {
+  height:72vh;
+  max-height:560px;
+  width:auto;
+  object-fit:contain;
+  object-position:bottom;
+  transition:opacity 0.5s ease, transform 0.5s ease;
+  filter:drop-shadow(0 8px 32px rgba(0,0,0,0.7));
+  -webkit-mask-image:linear-gradient(to bottom, black 55%, transparent 100%);
+  mask-image:linear-gradient(to bottom, black 55%, transparent 100%);
+}
+#char-img.hidden { opacity:0; transform:translateY(12px); }
+
+/* TITLE SCREEN */
+#title-screen {
+  position:absolute; inset:0; z-index:20;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+  background:linear-gradient(to bottom, #04080f, #08101a);
+  animation:fadeIn 2s ease;
+}
+.t-eyebrow { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:#a08848; font-family:sans-serif; }
+.t-title { font-size:38px; color:#f0d878; font-style:italic; text-shadow:0 0 40px rgba(100,150,255,0.3); }
+.t-sub { font-size:12px; color:#c8a850; letter-spacing:3px; text-transform:uppercase; font-family:sans-serif; }
+.t-click { margin-top:30px; font-size:12px; letter-spacing:4px; text-transform:uppercase; font-family:sans-serif; color:#d4a840; animation:pulse 2.5s infinite; cursor:pointer; }
+
+/* NAME SCREEN */
+#name-screen {
+  position:absolute; inset:0; z-index:20;
+  display:none; flex-direction:column; align-items:center; justify-content:center; gap:18px;
+}
+.n-label { font-size:12px; color:rgba(200,180,130,0.5); letter-spacing:3px; text-transform:uppercase; font-family:sans-serif; }
+.n-hint { font-size:11px; color:rgba(200,180,130,0.25); font-family:sans-serif; font-style:italic; }
+#name-input {
+  background:transparent; border:none; border-bottom:1px solid rgba(200,180,130,0.2);
+  color:#e8d8a8; font-size:28px; font-family:'Georgia',serif;
+  text-align:center; width:320px; padding:8px 0; outline:none; letter-spacing:2px;
+}
+#name-input::placeholder { color:rgba(200,180,130,0.15); }
+#name-confirm {
+  margin-top:8px; background:transparent;
+  border:1px solid rgba(200,180,130,0.2); color:rgba(200,180,130,0.5);
+  font-family:sans-serif; font-size:10px; letter-spacing:3px; text-transform:uppercase;
+  padding:11px 32px; cursor:pointer; transition:all 0.3s; border-radius:2px;
+}
+#name-confirm:hover { background:rgba(200,180,130,0.07); color:#e8d8a8; border-color:rgba(200,180,130,0.45); }
+
+/* DIALOGUE BOX */
+#dialogue-wrap {
+  position:relative; z-index:10;
+  margin:0 24px 20px;
+  background:rgba(2,2,8,0.92);
+  border:1px solid rgba(200,160,80,0.18);
+  border-radius:3px;
+  padding:16px 22px 14px;
+  backdrop-filter:blur(2px);
+  display:none;
+  cursor:pointer;
+}
+#speaker { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#f0c060; font-family:sans-serif; margin-bottom:8px; min-height:16px; }
+#dtext { font-size:15px; line-height:1.82; color:#f5dfa0; min-height:44px; }
+#cont-hint { position:absolute; bottom:12px; right:18px; font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(200,180,130,0.2); font-family:sans-serif; animation:pulse 2.2s infinite; }
+
+/* CHOICES */
+#choices { position:relative; z-index:10; display:none; flex-direction:column; gap:8px; margin:0 24px 20px; }
+.cbtn {
+  background:rgba(4,4,12,0.85); border:1px solid rgba(200,180,130,0.1);
+  color:#c8bc98; font-family:'Georgia',serif; font-size:13px;
+  padding:12px 18px; text-align:left; cursor:pointer;
+  transition:all 0.22s; border-radius:3px; line-height:1.55;
+}
+.cbtn:hover { background:rgba(200,180,130,0.06); border-color:rgba(200,180,130,0.28); color:#e8d8a8; transform:translateX(5px); }
+.ctag { font-size:9px; letter-spacing:2px; text-transform:uppercase; font-family:sans-serif; margin-right:9px; padding:2px 7px; border-radius:2px; }
+.tag-t { background:rgba(180,90,50,0.18); color:#c46040; }
+.tag-d { background:rgba(60,100,180,0.18); color:#6090d0; }
+.tag-b { background:rgba(80,160,100,0.18); color:#60b070; }
+
+/* NOTIF */
+#notif { position:fixed; top:52px; left:50%; transform:translateX(-50%); z-index:30; font-size:10px; letter-spacing:2px; text-transform:uppercase; font-family:sans-serif; padding:7px 18px; border-radius:3px; opacity:0; transition:opacity 0.4s; pointer-events:none; }
+.nt { background:rgba(180,90,50,0.12); color:#c46040; border:1px solid rgba(180,90,50,0.25); }
+.nd { background:rgba(60,100,180,0.12); color:#6090d0; border:1px solid rgba(60,100,180,0.25); }
+
+/* FADE */
+#fade { position:fixed; inset:0; z-index:25; background:#04080f; opacity:0; pointer-events:none; transition:opacity 1s ease; }
+#fade.on { opacity:1; pointer-events:all; }
+
+@keyframes pulse { 0%,100%{opacity:0.25} 50%{opacity:0.7} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+</style>
+</head>
+<body>
+<div id="fade"></div>
+<div id="notif"></div>
+<div id="game">
+  <div id="bg-layer"></div>
+  <div id="particles"></div>
+
+  <div id="top-bar">
+    <div id="game-title">Shadows of the Veil · Ossara</div>
+    <div id="stats">
+      <div class="stat">
+        <div class="stat-label">Temptation</div>
+        <div class="stat-bar"><div class="stat-fill temptation-fill" id="t-bar" style="width:0%"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Duty</div>
+        <div class="stat-bar"><div class="stat-fill duty-fill" id="d-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="main">
+    <!-- Title -->
+    <div id="title-screen">
+      <div class="t-eyebrow">Ossara</div>
+      <div class="t-title">Shadows of the Veil</div>
+      <div class="t-sub">Chapter I &mdash; Shattered Veil</div>
+      <div class="t-click" id="title-click">Click to begin</div>
+    </div>
+
+    <!-- Name -->
+    <div id="name-screen">
+      <div class="n-label">Your name in this world</div>
+      <input type="text" id="name-input" placeholder="Elaraen Voss" maxlength="24" autocomplete="off" spellcheck="false"/>
+      <div class="n-hint">Leave blank to use the default name</div>
+      <button id="name-confirm">Enter Ossara</button>
+    </div>
+
+    <!-- Character figure -->
+    <div id="char-wrap">
+      <img id="char-img" src="" alt="" class="hidden"/>
+    </div>
+
+    <!-- Dialogue -->
+    <div id="dialogue-wrap">
+      <div id="speaker"></div>
+      <div id="dtext"></div>
+      <div id="cont-hint">continue ▾</div>
+    </div>
+
+    <!-- Choices -->
+    <div id="choices"></div>
+  </div>
+</div>
+
+<script>
+// ── ASSETS ───────────────────────────────────────────────
+const IMGS = {
+  shore:       'https://matrixmemecoin.github.io/shadows-of-the-veil/shore.png',
+  haven_ext:   'https://matrixmemecoin.github.io/shadows-of-the-veil/outside.png',
+  haven_int:   'https://matrixmemecoin.github.io/shadows-of-the-veil/inside.png',
+  lira_normal: 'https://matrixmemecoin.github.io/shadows-of-the-veil/lira.png',
+  lira_seduct: 'https://matrixmemecoin.github.io/shadows-of-the-veil/lira%20sed.png',
+  lira_serious:'https://matrixmemecoin.github.io/shadows-of-the-veil/lira_serious.png',
+  lira_soft:   'https://matrixmemecoin.github.io/shadows-of-the-veil/lira_soft.png',
+  sael_normal: 'https://matrixmemecoin.github.io/shadows-of-the-veil/sael.png',
+  sael_seduct: 'https://matrixmemecoin.github.io/shadows-of-the-veil/sael%20sed.png',
+  sael_angry:  'https://matrixmemecoin.github.io/shadows-of-the-veil/sael_angry.png',
+  sael_soft:   'https://matrixmemecoin.github.io/shadows-of-the-veil/sael_soft.png',
+  pip_normal:  'https://matrixmemecoin.github.io/shadows-of-the-veil/pip_normal.png',
+  elder_vosska:'https://matrixmemecoin.github.io/shadows-of-the-veil/elder_vosska.png',
+  elder_threnn:'https://matrixmemecoin.github.io/shadows-of-the-veil/elder_threnn.png',
+  elder_mireth:'https://matrixmemecoin.github.io/shadows-of-the-veil/elder_mireth.png',
+};
+
+// Preload all images
+Object.values(IMGS).forEach(src => { const i = new Image(); i.src = src; });
+
+// ── STATE ─────────────────────────────────────────────────
+const S = { name:'Elaraen Voss', temptation:0, duty:0, waiting:false, queue:[], qi:0 };
+let lastBg = null, lastChar = null;
+
+// ── HELPERS ───────────────────────────────────────────────
+function setBg(key) {
+  if (key === lastBg) return;
+  lastBg = key;
+  const el = document.getElementById('bg-layer');
+  el.style.opacity = '0';
+  setTimeout(() => {
+    el.style.backgroundImage = `url(${IMGS[key]})`;
+    el.style.opacity = '1';
+  }, 400);
+}
+
+function setChar(key) {
+  const wrap = document.getElementById('char-wrap');
+  const img  = document.getElementById('char-img');
+  if (!key) {
+    img.classList.add('hidden');
+    setTimeout(() => { wrap.style.display = 'none'; lastChar = null; }, 500);
+    return;
+  }
+  if (key === lastChar) return;
+  lastChar = key;
+  img.classList.add('hidden');
+  setTimeout(() => {
+    img.src = IMGS[key];
+    wrap.style.display = 'flex';
+    requestAnimationFrame(() => requestAnimationFrame(() => img.classList.remove('hidden')));
+  }, 300);
+}
+
+function setParticles(type) {
+  const c = document.getElementById('particles');
+  c.innerHTML = '';
+  const cols = {
+    blue:   ['#2090c0','#30b0d8','#1a70a0'],
+    green:  ['#20a858','#18904a','#30c870'],
+    purple: ['#7050b0','#9070d0','#5030a0']
+  };
+  const pal = cols[type] || cols.blue;
+  for (let i = 0; i < 18; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const s = Math.random() * 3 + 1;
+    p.style.cssText = `width:${s}px;height:${s}px;left:${Math.random()*100}%;bottom:${Math.random()*15}%;background:${pal[i%3]};animation-duration:${7+Math.random()*9}s;animation-delay:${Math.random()*7}s;`;
+    c.appendChild(p);
+  }
+}
+
+function showNotif(txt, type) {
+  const el = document.getElementById('notif');
+  el.textContent = txt; el.className = type === 't' ? 'nt' : 'nd';
+  el.style.opacity = '1';
+  setTimeout(() => el.style.opacity = '0', 2200);
+}
+
+function updateStats() {
+  document.getElementById('t-bar').style.width = Math.min(S.temptation,100)+'%';
+  document.getElementById('d-bar').style.width = Math.min(S.duty,100)+'%';
+}
+
+function fadeGo(cb) {
+  const el = document.getElementById('fade');
+  el.classList.add('on');
+  setTimeout(() => { cb(); el.classList.remove('on'); }, 900);
+}
+
+// ── SCRIPT ────────────────────────────────────────────────
+const SCRIPT = [
+  { type:'narration', bg:'shore', particles:'blue', char:null,
+    text:'Cold waves lap at your legs as consciousness crawls back — slow and heavy. Salt stings the cuts on your arms. Your ribs ache with every breath. The last thing you remember is your couch, the flicker of a screen, and then — nothing.' },
+  { type:'narration', bg:'shore', particles:'blue', char:null,
+    text:'You open your eyes. Glowing sand pulses beneath you — soft blues and purples, as though the beach itself breathes. Strange trees with neon-veined bark sway at the edge of the mist. The air tastes electric.' },
+  { type:'thought', bg:'shore', particles:'blue', char:null,
+    text:'This isn\'t a dream. The pain is too real. The cold is too real. Where the hell am I?' },
+  { type:'dialogue', speaker:'Lira', bg:'shore', particles:'blue', char:'lira_normal',
+    text:'"Oh my... look what the tide dragged in. A lost little human? And quite a handsome one at that."' },
+  { type:'dialogue', speaker:'Sael', bg:'shore', particles:'blue', char:'sael_normal',
+    text:'"He\'s injured. Stop staring and help me lift him. We can\'t leave him here — the tide isn\'t the worst thing that comes with nightfall."' },
+  { type:'narration', bg:'shore', particles:'blue', char:null,
+    text:'They kneel beside you. Lira brushes wet hair from your forehead, her touch warm and unhurried. Sael checks your wounds with careful, practiced hands.' },
+  { type:'choice', bg:'shore', particles:'blue', char:null,
+    choices:[
+      { text:'Where am I? I need to get back home — this can\'t be real.', tag:'d', label:'Duty', eff:{duty:15}, next:'duty' },
+      { text:'Thank you... both of you. I don\'t know how I got here, but I\'m glad you found me.', tag:'b', label:'Balanced', eff:{}, next:'balanced' },
+      { text:'"Are you two real? Because you\'re either a dream or I died somewhere very interesting."', tag:'t', label:'Temptation', eff:{temptation:15}, next:'tempt' }
+    ]
+  }
+];
+
+const BRANCHES = {
+  duty:[
+    { type:'dialogue', speaker:'Sael', bg:'haven_ext', particles:'green', char:'sael_normal',
+      text:'"Good. Keep that focus — you\'ll need it here. You crossed through the Veil. It doesn\'t happen by accident."' },
+    { type:'dialogue', speaker:'Lira', bg:'haven_ext', particles:'green', char:'lira_normal',
+      text:'"Always so serious, Sael." She glances at you with a soft smile. "You\'re in Ossara. And no — you can\'t simply go back. Not yet."' },
+    { next:'haven' }
+  ],
+  balanced:[
+    { type:'dialogue', speaker:'Lira', bg:'haven_ext', particles:'green', char:'lira_normal',
+      text:'"Oh, polite. I like that." She tilts her head, ears perked with curiosity. "You\'re in Ossara. Strange world, strange rules. We\'ll explain on the way."' },
+    { type:'dialogue', speaker:'Sael', bg:'haven_ext', particles:'green', char:'sael_normal',
+      text:'"The Haven is close. Save your questions — walking is easier than talking when you\'re bleeding."' },
+    { next:'haven' }
+  ],
+  tempt:[
+    { type:'dialogue', speaker:'Lira', bg:'haven_ext', particles:'green', char:'lira_seduct',
+      text:'"Ha!" Her ears perk with delight. "He\'s funny. You\'re very much alive — and this is Ossara. Trust me, it\'s far more interesting than wherever you came from."' },
+    { type:'dialogue', speaker:'Sael', bg:'haven_ext', particles:'green', char:'sael_seduct',
+      text:'"Focus, both of you." The corner of her mouth twitches — almost a smile. "There\'s a settlement nearby. We move now."' },
+    { next:'haven' }
+  ],
+  haven:[
+    { type:'narration', bg:'haven_ext', particles:'purple', char:null,
+      text:'The Haven emerges from the forest like a secret the trees have kept for centuries — ancient structures woven into enormous roots, rope bridges between glowing formations, violet orbs drifting lazily overhead.' },
+    { type:'narration', bg:'haven_ext', particles:'purple', char:null,
+      text:'Figures move along the bridges above — some clearly anthro like Lira and Sael, others stranger still, shapes you can\'t quite place in the dim light. A few stop to stare as you pass. Word travels fast here, it seems.' },
+    { type:'dialogue', speaker:'Lira', bg:'haven_ext', particles:'purple', char:'lira_normal',
+      text:'"Don\'t mind the looks. A human hasn\'t crossed the Veil in... honestly, I don\'t actually know how long. You\'re something of an event."' },
+    { type:'dialogue', speaker:'Sael', bg:'haven_ext', particles:'purple', char:'sael_normal',
+      text:'"Which is exactly why the Elders will want to see you immediately. Before you\'ve even had water." She doesn\'t sound thrilled about it.' },
+    { type:'narration', bg:'haven_int', particles:'purple', char:null,
+      text:'They bring you into a warm healing chamber first — furs, glowing potions on worn shelves, soft amber candlelight. For a moment, just a moment, you\'re still.' },
+    { type:'dialogue', speaker:'Lira', bg:'haven_int', particles:'purple', char:'lira_normal',
+      text:'"Drink this before they call for you." She presses a small wooden cup into your hands, something warm and faintly sweet. "It\'ll help with the pain. Slightly."' },
+    { type:'thought', bg:'haven_int', particles:'purple', char:null,
+      text:'You drink it. It tastes like honey and static electricity, somehow. Your ribs still ache, but the edges of the pain dull just enough to think clearly.' },
+    { type:'dialogue', speaker:'Sael', bg:'haven_int', particles:'purple', char:'sael_normal',
+      text:'"They\'re ready for you. Whatever they ask — let us speak first. The Elders don\'t know you. They know what you are, and right now that\'s working against you."' },
+    { next:'council' }
+  ],
+
+  council:[
+    { type:'narration', bg:'haven_int', particles:'purple', char:null,
+      text:'The council chamber is carved directly into a colossal root system, lit by floating orbs that pulse slowly, like the room itself is breathing. Three Elders sit on raised stone seats, watching you in silence as you\'re brought before them.' },
+    { type:'dialogue', speaker:'Elder Voss\'ka', bg:'haven_int', particles:'purple', char:'elder_vosska',
+      text:'(an ancient owl-like figure, feathers silvered with age, voice sharp as a blade) "A human. Walking. Breathing. In Ossara." She doesn\'t blink. "Explain to me why this isn\'t the disaster it sounds like."' },
+    { type:'dialogue', speaker:'Sael', bg:'haven_int', particles:'purple', char:'sael_normal',
+      text:'"Because he didn\'t choose this, Elder. He washed up half-drowned on Caldenmoor Shore. We found him. We didn\'t summon him."' },
+    { type:'dialogue', speaker:'Elder Threnn', bg:'haven_int', particles:'purple', char:'elder_threnn',
+      text:'(a broad, mossy stag-like elder, voice low and measured) "Choice or not, the Veil doesn\'t simply *let* things through, Sael. Something opened it. Something let him in. That is the disaster Voss\'ka means."' },
+    { type:'dialogue', speaker:'Elder Mireth', bg:'haven_int', particles:'purple', char:'elder_mireth',
+      text:'(the youngest of the three, a quiet fox-like elder with calm eyes) "Or something is changing. The Veil has been thinning for a decade. We\'ve all felt it. Perhaps he is a symptom, not a cause."' },
+    { type:'dialogue', speaker:'Elder Voss\'ka', bg:'haven_int', particles:'purple', char:'elder_vosska',
+      text:'"Symptom or cause, he is a risk either way. I propose he is held in the lower chambers until we understand what crossed with him — and what may yet follow."' },
+    { type:'narration', bg:'haven_int', particles:'purple', char:null,
+      text:'The word *held* lands heavy in your chest. Beside you, Lira\'s tail goes rigid. Sael steps forward before you can even process what was just said.' },
+    { type:'dialogue', speaker:'Sael', bg:'haven_int', particles:'purple', char:'sael_angry',
+      text:'(her voice drops, sharp and unflinching) "He is injured, frightened, and has done nothing but exist. Lock him in the lower chambers and you confirm every fear he has about this world — and you\'ll do it without my help, Elder. I won\'t carry chains for you."' },
+    { type:'dialogue', speaker:'Elder Voss\'ka', bg:'haven_int', particles:'purple', char:'elder_vosska',
+      text:'"Mind your tone, Sael. You forget your place." Her feathers bristle. "You are a Warden of the Haven, not his protector."' },
+    { type:'dialogue', speaker:'Lira', bg:'haven_int', particles:'purple', char:'lira_serious',
+      text:'(stepping up beside Sael, all playfulness gone from her voice for once) "Then let the record show a Warden chose to protect an innocent over satisfying your fear, Elder. I\'ll stand beside her on this. Both of us will."' },
+    { type:'choice', bg:'haven_int', particles:'purple', char:null,
+      choices:[
+        { text:'Stay silent and let them fight for you — you don\'t know the rules here yet.', tag:'d', label:'Duty', eff:{duty:10}, next:'council_silent' },
+        { text:'"I just want to understand what happened to me. I\'m not a threat to anyone."', tag:'b', label:'Balanced', eff:{}, next:'council_balanced' },
+        { text:'"If standing in chains makes them feel better, I\'d rather make a different kind of impression."', tag:'t', label:'Temptation', eff:{temptation:10}, next:'council_bold' }
+      ]
+    }
+  ],
+
+  council_silent:[
+    { type:'dialogue', speaker:'Elder Mireth', bg:'haven_int', particles:'purple', char:'elder_mireth',
+      text:'(watching you carefully) "He holds his tongue. That, at least, speaks of sense." A pause. "I move that we observe rather than imprison. Let Lira and Sael vouch for his conduct. If he proves dangerous, we revisit this."' },
+    { next:'council_resolve' }
+  ],
+  council_balanced:[
+    { type:'dialogue', speaker:'Elder Mireth', bg:'haven_int', particles:'purple', char:'elder_mireth',
+      text:'(a small, approving nod) "Reasonable. Fear answered with reason rather than defiance." She glances toward Voss\'ka. "I move that we observe rather than imprison, with Lira and Sael responsible for his conduct."' },
+    { next:'council_resolve' }
+  ],
+  council_bold:[
+    { type:'dialogue', speaker:'Elder Threnn', bg:'haven_int', particles:'purple', char:'elder_threnn',
+      text:'(a low rumble that might almost be amusement) "Bold, for someone with sand still in his wounds." He exchanges a glance with Mireth. "I\'ll admit, I expected him to cower. He didn\'t."' },
+    { type:'dialogue', speaker:'Elder Mireth', bg:'haven_int', particles:'purple', char:'elder_mireth',
+      text:'"Nor flinch, nor threaten. I move that we observe rather than imprison — with Lira and Sael responsible for his conduct, given their... evident investment."' },
+    { next:'council_resolve' }
+  ],
+
+  council_resolve:[
+    { type:'dialogue', speaker:'Elder Voss\'ka', bg:'haven_int', particles:'purple', char:'elder_vosska',
+      text:'(a long, unreadable silence, feathers slowly settling) "...Fine. Observation. Not freedom — supervision. If anything follows him through that Veil, Sael, it is on your head and Lira\'s." She rises. "This council is closed."' },
+    { type:'narration', bg:'haven_int', particles:'purple', char:null,
+      text:'The Elders disperse without another word. The chamber suddenly feels much larger, much quieter. Lira exhales like she\'d been holding her breath the entire time.' },
+    { next:'aftermath' }
+  ],
+
+  aftermath:[
+    { type:'narration', bg:'haven_int', particles:'purple', char:null,
+      text:'Outside the council chamber, away from the Elders\' watchful eyes, Lira finally lets her shoulders drop. Sael leans against the carved wall, arms crossed, jaw tight.' },
+    { type:'dialogue', speaker:'Lira', bg:'haven_int', particles:'purple', char:'lira_normal',
+      text:'"Well. That went about as well as it could have, honestly." She manages a tired half-smile. "Voss\'ka has wanted an excuse to lock something in those lower chambers for years. Glad it wasn\'t you."' },
+    { type:'dialogue', speaker:'Sael', bg:'haven_int', particles:'purple', char:'sael_normal',
+      text:'"It shouldn\'t have been a question at all." She finally looks at you directly, something softer behind the usual hardness. "Are you alright? That wasn\'t exactly the warm welcome we promised."' },
+    { type:'choice', bg:'haven_int', particles:'purple', char:null,
+      choices:[
+        { text:'"I\'m fine. I just need to understand this world if I\'m going to survive in it."', tag:'d', label:'Duty', eff:{duty:10}, next:'aftermath_duty' },
+        { text:'"Honestly? No. But having you two on my side helped more than you know."', tag:'b', label:'Balanced', eff:{}, next:'aftermath_balanced' },
+        { text:'"I think I just watched two women threaten an entire council for me. I should be terrified. Mostly I\'m just impressed."', tag:'t', label:'Temptation', eff:{temptation:10}, next:'aftermath_tempt' }
+      ]
+    }
+  ],
+
+  aftermath_duty:[
+    { type:'dialogue', speaker:'Sael', bg:'haven_int', particles:'purple', char:'sael_soft',
+      text:'(a small nod, approving) "Good. That mindset will keep you alive here. I\'ll teach you what I can — the dangers, the unspoken rules. Ossara doesn\'t forgive ignorance easily."' },
+    { type:'dialogue', speaker:'Lira', bg:'haven_int', particles:'purple', char:'lira_soft',
+      text:'"She makes it sound so grim. It\'s not all danger and rules, {name}. There\'s beauty here too, if you let yourself see it." Her tail flicks, thoughtful.' },
+    { next:'messenger' }
+  ],
+  aftermath_balanced:[
+    { type:'dialogue', speaker:'Lira', bg:'haven_int', particles:'purple', char:'lira_soft',
+      text:'(her ears soften, genuinely touched) "...Good. I meant what I said in there. Whatever you are, wherever you came from — you\'re not nothing to us. Not after today."' },
+    { type:'dialogue', speaker:'Sael', bg:'haven_int', particles:'purple', char:'sael_soft',
+      text:'"That goes for me too, for whatever it\'s worth from someone who growls more than she talks." The faintest smile. "Rest. You\'ve earned it today."' },
+    { next:'messenger' }
+  ],
+  aftermath_tempt:[
+    { type:'dialogue', speaker:'Lira', bg:'haven_int', particles:'purple', char:'lira_seduct',
+      text:'(a warm laugh, golden eyes glinting) "Impressed, is it? Careful — keep talking like that and I\'ll start thinking you like trouble." She leans closer. "For the record, I don\'t mind it either."' },
+    { type:'dialogue', speaker:'Sael', bg:'haven_int', particles:'purple', char:'sael_seduct',
+      text:'(rolling her eyes, though there\'s warmth in it) "Don\'t encourage him, fox." But she holds your gaze a beat longer than necessary. "...Though for what it\'s worth, I\'d do it again."' },
+    { next:'messenger' }
+  ],
+
+  messenger:[
+    { type:'narration', bg:'haven_ext', particles:'green', char:null,
+      text:'As you step back out onto the bridges, a small, wiry figure practically skids to a stop in front of you — a lanky raccoon-like creature draped in mismatched pouches, charms, and what might be stolen jewelry.' },
+    { type:'dialogue', speaker:'Pip', bg:'haven_ext', particles:'green', char:'pip_normal',
+      text:'"WAIT. Wait wait wait. You\'re the human. THE human. The one everyone\'s whispering about." He circles you like you\'re a rare artifact. "Do you bite? Do you bargain? Please tell me you bargain, I have *incredible* things to trade."' },
+    { type:'dialogue', speaker:'Lira', bg:'haven_ext', particles:'green', char:'lira_normal',
+      text:'"Pip. He\'s been awake for less than a day and you\'re already trying to swindle him."' },
+    { type:'dialogue', speaker:'Pip', bg:'haven_ext', particles:'green', char:'pip_normal',
+      text:'"Swindle is such an *ugly* word, Lira. I prefer \'mutually enthusiastic exchange.\'" He grins, all teeth. "Word of advice, human — when the Elders start arguing about the Veil thinning? That\'s not new gossip. That\'s old fear with a fresh coat of paint. Been happening for years. Ask around."' },
+    { type:'dialogue', speaker:'Sael', bg:'haven_ext', particles:'green', char:'sael_normal',
+      text:'"Pip somehow knows everything that happens in this Haven roughly an hour before it happens. Annoying. Occasionally useful."' },
+    { type:'dialogue', speaker:'Pip', bg:'haven_ext', particles:'green', char:'pip_normal',
+      text:'"Occasionally?! I am *constantly* useful." He tosses you a small smooth stone, oddly warm to the touch. "Free sample. Keep it on you — Ossara\'s a lot friendlier when something\'s watching your back. Even something small."' },
+    { type:'thought', bg:'haven_ext', particles:'green', char:null,
+      text:'The stone hums faintly in your palm, like it\'s aware of you. You have no idea what it does. You pocket it anyway.' },
+    { next:'night_scene' }
+  ],
+
+  night_scene:[
+    { type:'narration', bg:'haven_int', particles:'purple', char:null,
+      text:'Night settles fully over the Haven. The healing chamber is quiet now, just the slow pulse of glowing potion-light and the distant murmur of the forest outside. Your body is exhausted in a way that feels almost good — earned, somehow.' },
+    { type:'dialogue', speaker:'Lira', bg:'haven_int', particles:'purple', char:'lira_normal',
+      text:'"Sael and I have rounds before dawn, but we\'ll be close." She pauses at the doorway, glancing back at you. "For what it\'s worth... I\'m glad the tide brought you here, and not somewhere else."' },
+    { type:'dialogue', speaker:'Sael', bg:'haven_int', particles:'purple', char:'sael_normal',
+      text:'"Get some real sleep this time. Tomorrow, the questions start — about the Veil, about why it let you through. Ossara doesn\'t usually hand out answers easily." She lingers a moment longer than she needs to before leaving.' },
+    { type:'thought', bg:'haven_int', particles:'purple', char:null,
+      text:'Alone, finally, you stare up at the woven root ceiling above you, the faint hum of Pip\'s stone in your pocket, the ache in your ribs, the impossible fact of everything that just happened.' },
+    { type:'choice', bg:'haven_int', particles:'purple', char:null,
+      choices:[
+        { text:'Try to piece together how the Veil works, and why it chose you.', tag:'d', label:'Duty', eff:{duty:10}, next:'end_ch1' },
+        { text:'Let yourself feel, for one moment, that maybe you weren\'t pulled here for nothing.', tag:'b', label:'Balanced', eff:{}, next:'end_ch1' },
+        { text:'Think about the way Lira lingered in the doorway, and the way Sael didn\'t quite leave either.', tag:'t', label:'Temptation', eff:{temptation:10}, next:'end_ch1' }
+      ]
+    }
+  ],
+
+  end_ch1:[
+    { type:'narration', bg:'haven_int', particles:'purple', char:null,
+      text:'Sleep takes you slowly, pulling you under like the tide that first delivered you here. Somewhere beyond the Haven, beyond the glowing forest, something vast and ancient stirs — aware, for the first time in a very long while, that the Veil has let something new walk in Ossara.' },
+    { type:'end' }
+  ]
+};
+
+// ── ENGINE ────────────────────────────────────────────────
+function processNode(node) {
+  if (!node) return;
+  if (node.bg)        setBg(node.bg);
+  if (node.particles) setParticles(node.particles);
+  if ('char' in node) setChar(node.char);
+
+  if (node.next) {
+    S.queue = BRANCHES[node.next] || [];
+    S.qi = 0; advance(); return;
+  }
+
+  if (node.type === 'choice') { showChoices(node); return; }
+  if (node.type === 'end')    { showEnd(); return; }
+
+  const dw = document.getElementById('dialogue-wrap');
+  const sp = document.getElementById('speaker');
+  const dt = document.getElementById('dtext');
+  dw.style.display = 'block';
+
+  if (node.type === 'narration') {
+    sp.textContent = '';
+    dt.style.fontStyle = 'italic';
+    dt.style.color = '#b8ac90';
+  } else if (node.type === 'thought') {
+    sp.textContent = S.name;
+    dt.style.fontStyle = 'italic';
+    dt.style.color = '#908070';
+  } else {
+    sp.textContent = node.speaker || '';
+    dt.style.fontStyle = 'normal';
+    dt.style.color = '#ddd0b0';
+  }
+  dt.textContent = (node.text||'').replace(/\{name\}/g, S.name);
+  S.waiting = true;
+}
+
+function advance() {
+  if (S.waiting) return;
+  if (S.qi < S.queue.length) processNode(S.queue[S.qi++]);
+}
+
+function showChoices(node) {
+  document.getElementById('dialogue-wrap').style.display = 'none';
+  setChar(null);
+  const el = document.getElementById('choices');
+  el.style.display = 'flex'; el.innerHTML = '';
+  node.choices.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'cbtn';
+    const tag = document.createElement('span');
+    tag.className = `ctag tag-${c.tag}`;
+    tag.textContent = c.label;
+    btn.appendChild(tag);
+    btn.appendChild(document.createTextNode(c.text));
+    btn.addEventListener('click', () => {
+      if (c.eff.temptation) { S.temptation += c.eff.temptation; showNotif('Temptation ▲','t'); }
+      if (c.eff.duty)       { S.duty += c.eff.duty; showNotif('Duty ▲','d'); }
+      updateStats();
+      el.style.display = 'none';
+      S.queue = BRANCHES[c.next] || []; S.qi = 0; advance();
+    });
+    el.appendChild(btn);
+  });
+}
+
+function showEnd() {
+  setChar(null);
+  const dw = document.getElementById('dialogue-wrap');
+  dw.style.display = 'block';
+  document.getElementById('speaker').textContent = '';
+  const dt = document.getElementById('dtext');
+  dt.textContent = '— End of Chapter I —';
+  dt.style.fontStyle = 'italic'; dt.style.color = '#907860';
+  document.getElementById('cont-hint').style.display = 'none';
+  S.waiting = true;
+}
+
+// ── CLICK ADVANCE ────────────────────────────────────────
+document.getElementById('dialogue-wrap').addEventListener('click', () => {
+  if (!S.waiting) return;
+  S.waiting = false; advance();
+});
+
+// ── TITLE → NAME → GAME ──────────────────────────────────
+document.getElementById('title-click').addEventListener('click', () => {
+  fadeGo(() => {
+    document.getElementById('title-screen').style.display = 'none';
+    document.getElementById('name-screen').style.display = 'flex';
+    setParticles('blue');
+    setBg('shore');
+  });
+});
+
+function startGame() {
+  const v = document.getElementById('name-input').value.trim();
+  S.name = v || 'Elaraen Voss';
+  fadeGo(() => {
+    document.getElementById('name-screen').style.display = 'none';
+    S.queue = SCRIPT; S.qi = 0;
+    advance();
+  });
+}
+
+document.getElementById('name-confirm').addEventListener('click', startGame);
+document.getElementById('name-input').addEventListener('keydown', e => { if(e.key==='Enter') startGame(); });
+
+// ── INIT ─────────────────────────────────────────────────
+setParticles('blue');
+</script>
+</body>
+</html>
